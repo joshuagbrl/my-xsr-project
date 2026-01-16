@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bike Project Manager</title>
+    <title>Project Manager</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     
@@ -31,7 +31,7 @@
                 const { value: name } = await Swal.fire({
                     title: 'Login Project',
                     input: 'text',
-                    inputPlaceholder: 'Username (ex: jacquelyn)',
+                    inputPlaceholder: 'Username',
                     background: '#161616',
                     color: '#e0e0e0',
                     confirmButtonColor: '#D000FF'
@@ -60,7 +60,7 @@
             window.importJacquelynData = () => {
                 Swal.fire({
                     title: 'Load Jacquelyn List?',
-                    text: "Ganti semua list ke standar XSR Cafe Racer?",
+                    text: "Change to XSR Cafe Racer list?",
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#D000FF',
@@ -79,7 +79,7 @@
             window.deleteItem = (index) => {
                 Swal.fire({
                     title: 'Hapus Item?',
-                    text: `Yakin mau hapus "${state.customItems[index].name}"?`,
+                    text: `Delete "${state.customItems[index].name}"?`,
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonColor: '#ff4d4d',
@@ -133,8 +133,118 @@
         };
 
         function render(state, userKey) {
-            document.getElementById('main-title').innerText = state.projectTitle || "PROJECT: " + userKey.toUpperCase();
+            document.getElementById('main-title').innerText = state.projectTitle || "Project: " + userKey.toUpperCase();
             document.getElementById('migrasi-area').style.display = (userKey === 'jacquelyn') ? 'block' : 'none';
+            const checklistBody = document.getElementById('checklist-body');
+            const tIn = document.getElementById('table-in');
+            const tOut = document.getElementById('table-out');
+            let wallet = 0, remainingTarget = 0, spentTarget = 0;
+            const history = state.history || [];
+            const customItems = state.customItems || [];
+            const checkedStates = state.checkedStates || {};
+
+            history.forEach(h => { wallet += (h.type === 'IN' ? h.amount : -h.amount); });
+            tIn.innerHTML = ''; tOut.innerHTML = '';
+            history.slice().reverse().forEach(h => {
+                const fmtPrice = new Intl.NumberFormat('id-ID').format(h.amount);
+                const row = `<tr><td>${h.desc}</td><td style="text-align: right;" class="${h.type=='IN'?'txt-success':'txt-danger'}">${h.type=='IN'?'+':'-'} ${fmtPrice}</td></tr>`;
+                if (h.type === 'IN') tIn.innerHTML += row; else tOut.innerHTML += row;
+            });
+
+            checklistBody.innerHTML = '';
+            customItems.forEach((item, i) => {
+                const isChecked = checkedStates[i];
+                if (isChecked) { spentTarget += item.price; wallet -= item.price; } 
+                else { remainingTarget += item.price; }
+                const fmtItemPrice = new Intl.NumberFormat('id-ID').format(item.price);
+                checklistBody.innerHTML += `<tr class="${isChecked ? 'checked' : ''}">
+                    <td class="col-check"><input type="checkbox" ${isChecked ? 'checked' : ''} onmousedown="toggle(${i})" onclick="return false;"></td>
+                    <td>${item.name}</td>
+                    <td style="text-align: right;">${fmtItemPrice}</td>
+                    <td style="text-align: center;"><span class="btn-delete" onclick="deleteItem(${i})">×</span></td>
+                </tr>`;
+            });
+
+            document.getElementById('wallet-val').innerText = "Rp" + new Intl.NumberFormat('id-ID').format(wallet);
+            document.getElementById('target-val').innerText = "Rp" + new Intl.NumberFormat('id-ID').format(remainingTarget);
+            const totalPlan = customItems.reduce((a, b) => a + b.price, 0);
+            const percent = totalPlan > 0 ? Math.round((spentTarget / totalPlan) * 100) : 0;
+            document.getElementById('progress-bar').style.width = percent + '%';
+            document.getElementById('progress-percent').innerText = percent + '% COMPLETED';
+            
+            if (percent === 100 && totalPlan > 0 && !window.hasCelebrated) {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+                window.hasCelebrated = true;
+            } else if (percent < 100) { window.hasCelebrated = false; }
+        }
+
+        initApp();
+
+        window.formatInput = (input) => {
+            let val = input.value.replace(/\D/g, "");
+            if (val === "") return;
+            input.value = new Intl.NumberFormat('id-ID').format(val);
+        };
+    </script>
+    <style>
+        :root { --bg-color: #20202B; --card-bg: #161616; --text-color: #e0e0e0; --accent-color: #D000FF; --success: #00ff88; --danger: #ff4d4d; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+        .main-title { color: #ffffff; font-size: 1.6em; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; text-align: center; }
+        .container { width: 100%; max-width: 500px; background: var(--card-bg); padding: 20px; border-radius: 15px; border: 1px solid #222; box-sizing: border-box; }
+        .dashboard { background: #222; padding: 15px; border-radius: 12px; margin-bottom: 20px; border-bottom: 3px solid var(--accent-color); }
+        .main-balance { font-size: 1.8em; font-weight: bold; color: #fff; margin: 5px 0; }
+        .progress-container { background: #333; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0; }
+        .progress-bar { background: var(--accent-color); height: 100%; width: 0%; transition: 0.5s; }
+        .input-group { background: #1a1a1a; padding: 12px; border-radius: 10px; margin-bottom: 15px; }
+        input { background: #000; border: 1px solid #333; color: #fff; padding: 10px; border-radius: 6px; width: 100%; margin-bottom: 8px; box-sizing: border-box; }
+        button { width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin-bottom: 5px; }
+        .btn-in { background: var(--success); } .btn-out { background: var(--danger); color: #fff; }
+        .btn-migrasi { background: #7E00AD; color: #fff; margin-bottom: 15px;}
+        .btn-delete { color: var(--danger); font-weight: bold; cursor: pointer; font-size: 1.2em; padding: 0 5px; }
+        .target-table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+        .target-table tr.checked { opacity: 0.3; text-decoration: line-through; }
+        .target-table td { padding: 10px 4px; border-bottom: 1px solid #222; }
+        .txt-success { color: var(--success); } .txt-danger { color: var(--danger); }
+        .hist-table { width: 100%; font-size: 0.75em; border-collapse: collapse; }
+    </style>
+</head>
+<body>
+    <div class="main-title" id="main-title">BIKE PROJECT</div>
+    <div class="container">
+        <div id="migrasi-area" style="display:none;">
+            <button class="btn-migrasi" onclick="importJacquelynData()">Load Data</button>
+        </div>
+        <div class="dashboard">
+            <div style="font-size: 0.7em; opacity: 0.5;">Budget Rn:</div>
+            <div class="main-balance" id="wallet-val">Rp0</div>
+            <div style="font-size: 0.8em; opacity: 0.5;">Remaining Price: <span id="target-val">Rp0</span></div>
+            <div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
+            <div id="progress-percent" style="font-size: 0.6em; color: var(--accent-color); text-align: right;">0%</div>
+        </div>
+        <div class="input-group">
+            <input type="text" id="item-name" placeholder="Add Items">
+            <input type="text" id="item-price" placeholder="Price" oninput="formatInput(this)">
+            <button style="background: #333; color: #fff;" onclick="addNewItem()">+ Add New Item</button>
+        </div>
+        <div class="input-group">
+            <input type="text" id="desc-input" placeholder="Wallet">
+            <input type="text" id="amount-input" placeholder="Nominal" oninput="formatInput(this)">
+            <div style="display: flex; gap: 8px;">
+                <button class="btn-in" onclick="addTransaction('IN')">Income</button>
+                <button class="btn-out" onclick="addTransaction('OUT')">Expenses</button>
+            </div>
+        </div>
+        <h3 style="font-size: 0.8em; color: var(--accent-color); border-left: 3px solid var(--accent-color); padding-left: 8px;">Checklist:</h3>
+        <table class="target-table"><tbody id="checklist-body"></tbody></table>
+        <h3 style="font-size: 0.8em; color: var(--accent-color); border-left: 3px solid var(--accent-color); padding-left: 8px; margin-top: 20px;">HISTORY</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div><table class="hist-table"><tbody id="table-in"></tbody></table></div>
+            <div><table class="hist-table"><tbody id="table-out"></tbody></table></div>
+        </div>
+        <button style="background: transparent; color: #444; font-size: 0.7em; border: 1px solid #222; margin-top: 20px;" onclick="logout()">LOGOUT / SWITCH ACCOUNT</button>
+    </div>
+</body>
+</html>            document.getElementById('migrasi-area').style.display = (userKey === 'jacquelyn') ? 'block' : 'none';
             const checklistBody = document.getElementById('checklist-body');
             const tIn = document.getElementById('table-in');
             const tOut = document.getElementById('table-out');
@@ -212,36 +322,37 @@
     <div class="main-title" id="main-title">BIKE PROJECT</div>
     <div class="container">
         <div id="migrasi-area" style="display:none;">
-            <button class="btn-migrasi" onclick="importJacquelynData()">LOAD DATA JACQUELYN</button>
+            <button class="btn-migrasi" onclick="importJacquelynData()">Load Data</button>
         </div>
         <div class="dashboard">
-            <div style="font-size: 0.7em; opacity: 0.5;">DANA TERSEDIA:</div>
+            <div style="font-size: 0.7em; opacity: 0.5;">Budget Rn:</div>
             <div class="main-balance" id="wallet-val">Rp0</div>
-            <div style="font-size: 0.8em; opacity: 0.5;">Sisa Belanja: <span id="target-val">Rp0</span></div>
+            <div style="font-size: 0.8em; opacity: 0.5;">Remaining Price: <span id="target-val">Rp0</span></div>
             <div class="progress-container"><div id="progress-bar" class="progress-bar"></div></div>
             <div id="progress-percent" style="font-size: 0.6em; color: var(--accent-color); text-align: right;">0%</div>
         </div>
         <div class="input-group">
             <input type="text" id="item-name" placeholder="Add Items">
             <input type="text" id="item-price" placeholder="Price" oninput="formatInput(this)">
-            <button style="background: #333; color: #fff;" onclick="addNewItem()">+ Simpan Barang</button>
+            <button style="background: #333; color: #fff;" onclick="addNewItem()">+ Add New Item</button>
         </div>
         <div class="input-group">
             <input type="text" id="desc-input" placeholder="Wallet">
             <input type="text" id="amount-input" placeholder="Nominal" oninput="formatInput(this)">
             <div style="display: flex; gap: 8px;">
-                <button class="btn-in" onclick="addTransaction('IN')">Masuk</button>
-                <button class="btn-out" onclick="addTransaction('OUT')">Keluar</button>
+                <button class="btn-in" onclick="addTransaction('IN')">Income</button>
+                <button class="btn-out" onclick="addTransaction('OUT')">Expenses</button>
             </div>
         </div>
-        <h3 style="font-size: 0.8em; color: var(--accent-color); border-left: 3px solid var(--accent-color); padding-left: 8px;">CHECKLIST MODIF</h3>
+        <h3 style="font-size: 0.8em; color: var(--accent-color); border-left: 3px solid var(--accent-color); padding-left: 8px;">Checklist:</h3>
         <table class="target-table"><tbody id="checklist-body"></tbody></table>
         <h3 style="font-size: 0.8em; color: var(--accent-color); border-left: 3px solid var(--accent-color); padding-left: 8px; margin-top: 20px;">HISTORY</h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
             <div><table class="hist-table"><tbody id="table-in"></tbody></table></div>
             <div><table class="hist-table"><tbody id="table-out"></tbody></table></div>
         </div>
-        <button style="background: transparent; color: #444; font-size: 0.7em; border: 1px solid #222; margin-top: 20px;" onclick="logout()">LOGOUT / GANTI USER</button>
+        <button style="background: transparent; color: #444; font-size: 0.7em; border: 1px solid #222; margin-top: 20px;" onclick="logout()">LOGOUT / SWITCH ACCOUNT</button>
     </div>
 </body>
 </html>
+
