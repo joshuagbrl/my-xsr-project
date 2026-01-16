@@ -21,6 +21,7 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         const dataRef = ref(db, 'project_data');
+        const authKeyRef = ref(db, 'auth_key');
         const MY_PIN = "1505"; 
 
         const items = [
@@ -37,7 +38,6 @@
 
         let state = { history: [], checkedStates: {} };
 
-        // FUNGSI CEK KEAMANAN (INGAT SAYA)
         function checkAuth() {
             if (localStorage.getItem('jacquelyn_auth') === 'true') return true;
             const pin = prompt("Enter PIN:");
@@ -51,13 +51,18 @@
 
         function formatIDR(n) { return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(n); }
 
+        function saveData() {
+            set(authKeyRef, 'JACQUELYN_SAFE_2026');
+            set(dataRef, state);
+        }
+
         window.addTransaction = (type) => {
             if(!checkAuth()) return;
             const desc = document.getElementById('desc-input').value;
             const amount = parseFloat(document.getElementById('amount-input').value);
             if (!desc || !amount) return;
             state.history.push({ desc, amount, type });
-            set(dataRef, state);
+            saveData();
             document.getElementById('desc-input').value = '';
             document.getElementById('amount-input').value = '';
         };
@@ -65,7 +70,7 @@
         window.toggle = (i) => {
             if(!checkAuth()) return;
             state.checkedStates[i] = !state.checkedStates[i];
-            set(dataRef, state);
+            saveData();
         };
 
         onValue(dataRef, (snapshot) => {
@@ -162,5 +167,3 @@
 </div>
 </body>
 </html>
-
-
