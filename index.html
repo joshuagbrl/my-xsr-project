@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Project Manager</title>
+    <title>Bike Project Manager</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
@@ -22,109 +24,126 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         
-        let rawInput = localStorage.getItem('xsr_user_key');
-        if (!rawInput) {
-            rawInput = prompt("Masukkan Username:") || "guest";
-        }
-        const userKey = rawInput.toLowerCase().trim().replace(/\s+/g, '');
-        localStorage.setItem('xsr_user_key', userKey);
+        let userKey = localStorage.getItem('xsr_user_key');
 
-        const userPath = `users/${userKey}`;
-        const dataRef = ref(db, userPath);
+        const initApp = async () => {
+            if (!userKey) {
+                const { value: name } = await Swal.fire({
+                    title: 'Login Project',
+                    input: 'text',
+                    inputPlaceholder: 'Username (ex: jacquelyn)',
+                    background: '#161616',
+                    color: '#e0e0e0',
+                    confirmButtonColor: '#D000FF'
+                });
+                userKey = (name || "guest").toLowerCase().trim().replace(/\s+/g, '');
+                localStorage.setItem('xsr_user_key', userKey);
+                location.reload();
+            }
 
-        let state = { projectTitle: "Project: " + userKey.toUpperCase(), history: [], checkedStates: {}, customItems: [] };
+            const userPath = `users/${userKey}`;
+            const dataRef = ref(db, userPath);
+            let state = { projectTitle: "Project: " + userKey.toUpperCase(), history: [], checkedStates: {}, customItems: [] };
 
-        const jacquelynDefaults = [
-            { name: "Helm KYT R2R", price: 2100000 },
-            { name: "Action Cam", price: 1000000 },
-            { name: "Intercom Budget/Ejeas", price: 350000 },
-            { name: "Stang Clubman", price: 132000 },
-            { name: "Spion Bar End", price: 100000 },
-            { name: "Tail Tidy", price: 100000 },
-            { name: "Mudguard", price: 130000 },
-            { name: "Phone Holder GUB", price: 50000 },
-            { name: "Radiator Guard", price: 150000 }
-        ];
+            const jacquelynDefaults = [
+                { name: "Helm KYT R2R", price: 2100000 },
+                { name: "Action Cam", price: 1000000 },
+                { name: "Intercom Budget/Ejeas", price: 350000 },
+                { name: "Stang Clubman", price: 132000 },
+                { name: "Spion Bar End", price: 100000 },
+                { name: "Tail Tidy", price: 100000 },
+                { name: "Mudguard", price: 130000 },
+                { name: "Phone Holder GUB", price: 50000 },
+                { name: "Radiator Guard", price: 150000 }
+            ];
 
-        // --- FUNGSI FORMAT INPUT (TITIK OTOMATIS) ---
-        window.formatInput = (input) => {
-            let val = input.value.replace(/\D/g, ""); // Hapus karakter non-angka
-            if (val === "") return;
-            input.value = new Intl.NumberFormat('id-ID').format(val);
-        };
+            window.importJacquelynData = () => {
+                Swal.fire({
+                    title: 'Load Jacquelyn List?',
+                    text: "Ganti semua list ke standar XSR Cafe Racer?",
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#D000FF',
+                    cancelButtonColor: '#333',
+                    background: '#161616',
+                    color: '#e0e0e0'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        state.customItems = jacquelynDefaults;
+                        state.projectTitle = "Project: XSR CAFE RACER";
+                        set(dataRef, state);
+                    }
+                });
+            };
 
-        const getRawValue = (id) => {
-            return parseFloat(document.getElementById(id).value.replace(/\./g, "")) || 0;
-        };
+            window.deleteItem = (index) => {
+                Swal.fire({
+                    title: 'Hapus Item?',
+                    text: `Yakin mau hapus "${state.customItems[index].name}"?`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ff4d4d',
+                    cancelButtonColor: '#333',
+                    background: '#161616',
+                    color: '#e0e0e0'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        state.customItems.splice(index, 1);
+                        if(state.checkedStates) delete state.checkedStates[index];
+                        set(dataRef, state);
+                    }
+                });
+            };
 
-        window.importJacquelynData = () => {
-            if(confirm("Gunakan list barang default Jacquelyn?")) {
-                state.customItems = jacquelynDefaults;
-                state.projectTitle = "Project: XSR CAFE RACER";
+            window.addNewItem = () => {
+                const name = document.getElementById('item-name').value;
+                const price = parseFloat(document.getElementById('item-price').value.replace(/\./g, "")) || 0;
+                if (!name || !price) return;
+                if(!state.customItems) state.customItems = [];
+                state.customItems.push({ name, price });
                 set(dataRef, state);
-            }
+                document.getElementById('item-name').value = '';
+                document.getElementById('item-price').value = '';
+            };
+
+            window.addTransaction = (type) => {
+                const desc = document.getElementById('desc-input').value;
+                const amount = parseFloat(document.getElementById('amount-input').value.replace(/\./g, "")) || 0;
+                if (!desc || !amount) return;
+                if(!state.history) state.history = [];
+                state.history.push({ desc, amount, type });
+                set(dataRef, state);
+                document.getElementById('desc-input').value = '';
+                document.getElementById('amount-input').value = '';
+            };
+
+            window.toggle = (i) => {
+                if(!state.checkedStates) state.checkedStates = {};
+                state.checkedStates[i] = !state.checkedStates[i];
+                set(dataRef, state);
+            };
+
+            window.logout = () => { localStorage.removeItem('xsr_user_key'); location.reload(); };
+
+            onValue(dataRef, (snapshot) => {
+                const data = snapshot.val();
+                if (data) state = data;
+                render(state, userKey);
+            });
         };
 
-        window.saveData = () => { set(dataRef, state); };
-        window.logout = () => { localStorage.removeItem('xsr_user_key'); location.reload(); };
-        
-        window.addNewItem = () => {
-            const name = document.getElementById('item-name').value;
-            const price = getRawValue('item-price');
-            if (!name || !price) return;
-            if(!state.customItems) state.customItems = [];
-            state.customItems.push({ name, price });
-            window.saveData();
-            document.getElementById('item-name').value = '';
-            document.getElementById('item-price').value = '';
-        };
-
-        window.deleteItem = (index) => {
-            if(confirm(`Hapus "${state.customItems[index].name}"?`)) {
-                state.customItems.splice(index, 1);
-                if(state.checkedStates) delete state.checkedStates[index];
-                window.saveData();
-            }
-        };
-
-        window.addTransaction = (type) => {
-            const desc = document.getElementById('desc-input').value;
-            const amount = getRawValue('amount-input');
-            if (!desc || !amount) return;
-            if(!state.history) state.history = [];
-            state.history.push({ desc, amount, type });
-            window.saveData();
-            document.getElementById('desc-input').value = '';
-            document.getElementById('amount-input').value = '';
-        };
-
-        window.toggle = (i) => {
-            if(!state.checkedStates) state.checkedStates = {};
-            state.checkedStates[i] = !state.checkedStates[i];
-            window.saveData();
-        };
-
-        onValue(dataRef, (snapshot) => {
-            const data = snapshot.val();
-            if (data) state = data;
-            render();
-        });
-
-        function render() {
-            document.getElementById('main-title').innerText = state.projectTitle || "Project: " + userKey.toUpperCase();
+        function render(state, userKey) {
+            document.getElementById('main-title').innerText = state.projectTitle || "PROJECT: " + userKey.toUpperCase();
             document.getElementById('migrasi-area').style.display = (userKey === 'jacquelyn') ? 'block' : 'none';
-
             const checklistBody = document.getElementById('checklist-body');
             const tIn = document.getElementById('table-in');
             const tOut = document.getElementById('table-out');
             let wallet = 0, remainingTarget = 0, spentTarget = 0;
-            
             const history = state.history || [];
             const customItems = state.customItems || [];
             const checkedStates = state.checkedStates || {};
 
             history.forEach(h => { wallet += (h.type === 'IN' ? h.amount : -h.amount); });
-
             tIn.innerHTML = ''; tOut.innerHTML = '';
             history.slice().reverse().forEach(h => {
                 const fmtPrice = new Intl.NumberFormat('id-ID').format(h.amount);
@@ -142,23 +161,30 @@
                     <td class="col-check"><input type="checkbox" ${isChecked ? 'checked' : ''} onmousedown="toggle(${i})" onclick="return false;"></td>
                     <td>${item.name}</td>
                     <td style="text-align: right;">${fmtItemPrice}</td>
-                    <td style="text-align: center; width: 30px;"><span class="btn-delete" onclick="deleteItem(${i})">×</span></td>
+                    <td style="text-align: center;"><span class="btn-delete" onclick="deleteItem(${i})">×</span></td>
                 </tr>`;
             });
 
             document.getElementById('wallet-val').innerText = "Rp" + new Intl.NumberFormat('id-ID').format(wallet);
             document.getElementById('target-val').innerText = "Rp" + new Intl.NumberFormat('id-ID').format(remainingTarget);
-            
             const totalPlan = customItems.reduce((a, b) => a + b.price, 0);
             const percent = totalPlan > 0 ? Math.round((spentTarget / totalPlan) * 100) : 0;
             document.getElementById('progress-bar').style.width = percent + '%';
             document.getElementById('progress-percent').innerText = percent + '% COMPLETED';
-
+            
             if (percent === 100 && totalPlan > 0 && !window.hasCelebrated) {
                 confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
                 window.hasCelebrated = true;
             } else if (percent < 100) { window.hasCelebrated = false; }
         }
+
+        initApp();
+
+        window.formatInput = (input) => {
+            let val = input.value.replace(/\D/g, "");
+            if (val === "") return;
+            input.value = new Intl.NumberFormat('id-ID').format(val);
+        };
     </script>
     <style>
         :root { --bg-color: #0d0d0d; --card-bg: #161616; --text-color: #e0e0e0; --accent-color: #D000FF; --success: #00ff88; --danger: #ff4d4d; }
@@ -196,13 +222,13 @@
             <div id="progress-percent" style="font-size: 0.6em; color: var(--accent-color); text-align: right;">0%</div>
         </div>
         <div class="input-group">
-            <input type="text" id="item-name" placeholder="Tambah Barang Baru">
-            <input type="text" id="item-price" placeholder="Harga Rp (Otomatis Titik)" oninput="formatInput(this)">
+            <input type="text" id="item-name" placeholder="Add Items">
+            <input type="text" id="item-price" placeholder="Price" oninput="formatInput(this)">
             <button style="background: #333; color: #fff;" onclick="addNewItem()">+ Simpan Barang</button>
         </div>
         <div class="input-group">
-            <input type="text" id="desc-input" placeholder="Ket. Dompet">
-            <input type="text" id="amount-input" placeholder="Nominal Rp (Otomatis Titik)" oninput="formatInput(this)">
+            <input type="text" id="desc-input" placeholder="Wallet">
+            <input type="text" id="amount-input" placeholder="Nominal" oninput="formatInput(this)">
             <div style="display: flex; gap: 8px;">
                 <button class="btn-in" onclick="addTransaction('IN')">Masuk</button>
                 <button class="btn-out" onclick="addTransaction('OUT')">Keluar</button>
